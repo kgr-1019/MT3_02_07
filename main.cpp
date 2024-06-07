@@ -68,7 +68,7 @@ Vector3 ClosestPoint(const Vector3& point, const Segment& segment);
 // 座標変換
 Vector3 Transform(const Vector3& point, const Matrix4x4& transformMatrix);
 // 衝突判定
-//bool IsCollision(const AABB& aabb1, const Sphere& sphere);
+bool IsCollision(const AABB& aabb1, const Segment& segment);
 // グリッド
 void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix);
 // AABB1の描画
@@ -338,13 +338,6 @@ Vector3 Transform(const Vector3& point, const Matrix4x4& transformMatrix)
 	return result;
 }
 
-// 球と球の距離(内積)
-float Length(const Vector3& v1)
-{
-	float length = sqrtf(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z);
-	return length;
-}
-
 // 内積(v1・v2)
 float Dot(const Vector3& v1, const Vector3& v2)
 {
@@ -360,16 +353,6 @@ Vector3 Normalize(const Vector3& v2)
 	normalize.y = v2.y / sqrtf(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
 	normalize.z = v2.z / sqrtf(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
 	return normalize;
-}
-
-// 垂直なベクトルを求める
-Vector3 Perpendicular(const Vector3& vector)
-{
-	if (vector.x != 0.0f || vector.y != 0.0f)
-	{
-		return { -vector.y,vector.x,0.0f };
-	}
-	return { 0.0f,-vector.z,vector.y };
 }
 
 // 正射影ベクトル
@@ -401,26 +384,41 @@ Vector3 ClosestPoint(const Vector3& point, const Segment& segment)
 
 
 // 衝突判定
-//bool IsCollision(const AABB& aabb1, const Sphere& sphere)
-//{
-//	// 最近接点を求める
-//	Vector3 closestPoint{ std::clamp(sphere.center.x,aabb1.min.x,aabb1.max.x),
-//	std::clamp(sphere.center.y,aabb1.min.y,aabb1.max.y),
-//	std::clamp(sphere.center.z,aabb1.min.z,aabb1.max.z) };
-//
-//	// 最近接点と球の中心との距離を求める
-//	float distance = Length(Subtract(closestPoint, sphere.center));
-//
-//	// 距離が半径よりも小さければ衝突
-//	if (distance <= sphere.radius)
-//	{
-//		return true;
-//	}
-//	else
-//	{
-//		return false;
-//	}
-//}
+bool IsCollision(const AABB& aabb1, const Segment& segment)
+{
+	// tmin , tmax を求める
+	Vector3 tMin = { 
+	(aabb1.min.x - segment.origin.x) / segment.diff.x,
+	(aabb1.min.y - segment.origin.y) / segment.diff.y,
+	(aabb1.min.z - segment.origin.z) / segment.diff.z 
+	};
+
+	Vector3 tMax = {
+	(aabb1.max.x - segment.origin.x) / segment.diff.x,
+	(aabb1.max.y - segment.origin.y) / segment.diff.y,
+	(aabb1.max.z - segment.origin.z) / segment.diff.z
+	};
+
+	// tNear , tFar を求める
+	Vector3 tNear = { min(tMin.x, tMax.x),min(tMin.y, tMax.y),min(tMin.z, tMax.z) };
+	Vector3 tFar = { max(tMin.x, tMax.x),max(tMin.y, tMax.y),max(tMin.z, tMax.z) };
+
+
+	// AABBとの衝突点(貫通点)の t が小さい方
+	float tmin = max(max(tNear.x, tNear.y), tNear.z);
+
+	// AABBとの衝突点(貫通点)の t が大きい方
+	float tmax = min(min(tFar.x, tFar.y), tFar.z);
+
+	if (tmin <= tmax)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
 
 // Gridを表示する
 void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
@@ -482,7 +480,6 @@ void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMa
 		Novice::DrawLine((int)screenVerticesLeft.x, (int)screenVerticesLeft.y, (int)screenVerticesRight.x, (int)screenVerticesRight.y, 0xAAAAAAFF);
 	}
 }
-
 
 // AABB1の描画
 void DrawAABB1(const AABB& aabb1, Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
@@ -560,7 +557,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		.diff{2.0f,-0.5f,0.0f}
 	};
 
-	Vector3 point{ -1.5f,0.6f,0.6f };
+	Vector3 point
+	{
+		-1.5f,0.6f,0.6f 
+	};
 
 
 	AABB aabb1
@@ -624,14 +624,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 		// 当たり判定
-		//if (IsCollision(aabb1, sphere))
-		//{
-		//	// あたってたら赤色になる
-		//	color = RED;
-		//}
-		//else {
-		//	color = WHITE;
-		//}
+		if (IsCollision(aabb1, segment))
+		{
+			// あたってたら赤色になる
+			color = RED;
+		}
+		else {
+			color = WHITE;
+		}
 
 
 		// 線
